@@ -1,0 +1,10 @@
+{
+  "name": "notion-database-system-map",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Live visual map of a Notion database registry",
+  "scripts": {
+    "test": "node tests/api.test.js"
+  }
+}
