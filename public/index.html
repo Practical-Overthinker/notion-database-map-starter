@@ -819,24 +819,6 @@
       </main>
     </div>
     <script>
-      const palette = {
-        Business: { solid: "#5E9FE8", soft: "#EAF3FD" },
-        Productivity: { solid: "#46A171", soft: "#EAF4EE" },
-        Knowledge: { solid: "#9A70C5", soft: "#F2ECF8" },
-        Lifestyle: { solid: "#D5803B", soft: "#FBEEE3" },
-        Systems: { solid: "#D66A93", soft: "#F9EAF0" },
-        Attendance: { solid: "#3D8B8B", soft: "#E8F5F4" },
-        Directory: { solid: "#4D7DB5", soft: "#EBF2FA" },
-        Equipment: { solid: "#B76D37", soft: "#FAEEE5" },
-        "Requests & Bugs": { solid: "#C65B5B", soft: "#FBECEC" },
-        Mentored: { solid: "#8961B3", soft: "#F1ECF7" },
-        Content: { solid: "#4A966D", soft: "#EAF5EE" },
-        Initiatives: { solid: "#6D70C4", soft: "#EFEFFE" },
-        Chapters: { solid: "#C0648E", soft: "#F8EAF0" },
-        "Public Facing Pages": { solid: "#A47C2E", soft: "#FBF4E4" },
-        Documents: { solid: "#61707D", soft: "#EDF1F4" },
-        Uncategorized: { solid: "#77736E", soft: "#F0EFED" },
-      };
       const glyphs = {
         notion_gray: "N",
         "flag-checkered_gray": "⚑",
@@ -878,22 +860,10 @@
           "Deprecated",
           "Archived",
           "Active Live",
-        ],
-        DEFAULT_CATEGORIES = [
-          "Attendance",
-          "Directory",
-          "Equipment",
-          "Requests & Bugs",
-          "Mentored",
-          "Content",
-          "Initiatives",
-          "Chapters",
-          "Public Facing Pages",
-          "Documents",
         ];
       let STATUS = [...DEFAULT_STATUS],
-        CATEGORIES = [...DEFAULT_CATEGORIES],
-        order = [...DEFAULT_CATEGORIES];
+        CATEGORIES = [],
+        order = [];
       let byId = Object.fromEntries(nodes.map((n) => [n.id, n]));
       const W = 205,
         H = 72,
@@ -970,12 +940,9 @@
           ];
         CATEGORIES = liveCategories.length
           ? liveCategories
-          : [...DEFAULT_CATEGORIES];
+          : ["Uncategorized"];
         STATUS = liveStatuses.length ? liveStatuses : [...DEFAULT_STATUS];
-        order = [
-          ...order.filter((cat) => CATEGORIES.includes(cat)),
-          ...CATEGORIES.filter((cat) => !order.includes(cat)),
-        ];
+        order = [...CATEGORIES];
         nodes = data.nodes.map((item) => {
           const description =
             item.description || item.notes || "Notion database";
@@ -1028,7 +995,7 @@
           console.warn("Using the static map snapshot:", error);
           refreshButton.dataset.tooltip = "Sync failed — click to retry";
           syncState.classList.add("show", "error");
-          syncState.innerHTML = `<strong>Unable to load this workspace</strong><span>${error.message}. Check the Vercel environment variables, then use the refresh button.</span>`;
+          syncState.innerHTML = `<strong>Unable to load this workspace</strong><span>${escapeHtml(error.message)}. Check the Vercel environment variables, then use the refresh button.</span>`;
           if (!quiet) alert(`Could not refresh from Notion: ${error.message}`);
         } finally {
           refreshButton.disabled = false;
@@ -1088,7 +1055,20 @@
         );
       }
       function categoryStyle(category) {
-        return palette[category] || palette.Uncategorized;
+        let hash = 0;
+        for (const char of category) {
+          hash = (Math.imul(hash, 31) + char.codePointAt(0)) >>> 0;
+        }
+        const hue = hash % 360;
+        return {
+          solid: `hsl(${hue} 45% 40%)`,
+          soft: `hsl(${hue} 65% 94%)`,
+        };
+      }
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+        })[char]);
       }
       function isInactiveStatus(status) {
         return ["Archived", "Deprecated", "Legacy"].includes(status);
@@ -1098,8 +1078,9 @@
           .map((cat, i) => {
             const z = zonesMap[cat],
               p = categoryStyle(cat),
-              count = nodes.filter((n) => n.c === cat).length;
-            return `<g data-cat="${cat}"><rect class="zone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="18" fill="${p.soft}" stroke="${p.solid}55"/><text class="zone-title" x="${z.x + 20}" y="${z.y + 29}">${cat.toUpperCase()}</text><text class="zone-sub" x="${z.x + 20}" y="${z.y + 45}">${count} database${count === 1 ? "" : "s"}</text><g class="zone-move up" data-cat="${cat}" transform="translate(${z.x + z.w - 70},${z.y + 16})"><rect width="25" height="25" rx="7"/><path d="M7 15l5.5-6 5.5 6"/></g><g class="zone-move down" data-cat="${cat}" transform="translate(${z.x + z.w - 37},${z.y + 16})"><rect width="25" height="25" rx="7"/><path d="M7 10l5.5 6 5.5-6"/></g></g>`;
+              count = nodes.filter((n) => n.c === cat).length,
+              safeCat = escapeHtml(cat);
+            return `<g data-cat="${safeCat}"><rect class="zone" x="${z.x}" y="${z.y}" width="${z.w}" height="${z.h}" rx="18" fill="${p.soft}" stroke="${p.solid}" stroke-opacity="0.33"/><text class="zone-title" x="${z.x + 20}" y="${z.y + 29}">${escapeHtml(cat.toUpperCase())}</text><text class="zone-sub" x="${z.x + 20}" y="${z.y + 45}">${count} database${count === 1 ? "" : "s"}</text><g class="zone-move up" data-cat="${safeCat}" transform="translate(${z.x + z.w - 70},${z.y + 16})"><rect width="25" height="25" rx="7"/><path d="M7 15l5.5-6 5.5 6"/></g><g class="zone-move down" data-cat="${safeCat}" transform="translate(${z.x + z.w - 37},${z.y + 16})"><rect width="25" height="25" rx="7"/><path d="M7 10l5.5 6 5.5-6"/></g></g>`;
           })
           .join("");
         zoneLayer.querySelectorAll(".zone-move").forEach(
@@ -1176,7 +1157,7 @@
           );
           g.setAttribute("transform", `translate(${n.x},${n.y})`);
           g.dataset.id = n.id;
-          g.innerHTML = `<rect class="card" width="${W}" height="${H}"/><rect class="bar" width="5" height="${H}" rx="3" fill="${p.solid}"/><text class="name" x="14" y="24">${n.n}</text><text class="role" x="14" y="39">${n.role}</text><g class="badge-toggle category-toggle"><rect x="13" y="51" width="${cw}" height="15" rx="5" fill="${p.soft}"/><text class="badgeText" x="20" y="61.7" fill="${p.solid}">${n.c.toUpperCase()}  ▾</text></g><g class="badge-toggle status-toggle"><rect x="${sx}" y="51" width="${sw}" height="15" rx="5" fill="${ss[0]}"/><text class="badgeText" x="${sx + 6}" y="61.7" fill="${ss[1]}">${n.s.toUpperCase()}  ▾</text></g><text class="count" x="${W - 15}" y="11" text-anchor="end">${count} ↗</text>${self ? `<g class="self-badge" transform="translate(${badgeX},12)"><path d="M5 8a4.5 4.5 0 1 0 1.5-3.4L5 6"/><path d="M5 2.5V6h3.5"/></g>` : ""}`;
+          g.innerHTML = `<rect class="card" width="${W}" height="${H}"/><rect class="bar" width="5" height="${H}" rx="3" fill="${p.solid}"/><text class="name" x="14" y="24">${escapeHtml(n.n)}</text><text class="role" x="14" y="39">${escapeHtml(n.role)}</text><g class="badge-toggle category-toggle"><rect x="13" y="51" width="${cw}" height="15" rx="5" fill="${p.soft}"/><text class="badgeText" x="20" y="61.7" fill="${p.solid}">${escapeHtml(n.c.toUpperCase())}  ▾</text></g><g class="badge-toggle status-toggle"><rect x="${sx}" y="51" width="${sw}" height="15" rx="5" fill="${ss[0]}"/><text class="badgeText" x="${sx + 6}" y="61.7" fill="${ss[1]}">${escapeHtml(n.s.toUpperCase())}  ▾</text></g><text class="count" x="${W - 15}" y="11" text-anchor="end">${count} ↗</text>${self ? `<g class="self-badge" transform="translate(${badgeX},12)"><path d="M5 8a4.5 4.5 0 1 0 1.5-3.4L5 6"/><path d="M5 2.5V6h3.5"/></g>` : ""}`;
           nodeLayer.appendChild(g);
           enableDrag(g, n);
           g.onclick = (e) => {
@@ -1236,7 +1217,7 @@
           opts
             .map(
               (o) =>
-                `<button data-value="${o}" class="${o === current ? "selected" : ""}"><span class="dot" style="background:${type === "category" ? categoryStyle(o).solid : statusStyle(o)[1]}"></span>${o}</button>`,
+                `<button data-value="${escapeHtml(o)}" class="${o === current ? "selected" : ""}"><span class="dot" style="background:${type === "category" ? categoryStyle(o).solid : statusStyle(o)[1]}"></span>${escapeHtml(o)}</button>`,
             )
             .join("");
         badgeMenu.classList.add("open");
@@ -1300,7 +1281,7 @@
                 .map((e) => {
                   const oid = dir === "in" ? e[0] : e[1],
                     o = byId[oid];
-                  return `<li><button class="rel" data-id="${oid}"><strong>${o.n}</strong><span>${e[2]}</span></button></li>`;
+                  return `<li><button class="rel" data-id="${escapeHtml(oid)}"><strong>${escapeHtml(o.n)}</strong><span>${escapeHtml(e[2])}</span></button></li>`;
                 })
                 .join("")}</ul>`
             : "";
